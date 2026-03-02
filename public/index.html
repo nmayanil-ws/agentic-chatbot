@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sage — Mental Health Support</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --cream:   #f7f4f0;
+      --sage:    #5a8a7e;
+      --sage-lt: #e8f2f0;
+      --sage-dk: #3d6b61;
+      --white:   #ffffff;
+      --text:    #2d3436;
+      --muted:   #636e72;
+      --border:  #e0d8d0;
+      --overlay: rgba(0,0,0,0.35);
+      --radius:  12px;
+      --shadow:  0 2px 16px rgba(0,0,0,0.08);
+    }
+
+    html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--cream); color: var(--text); }
+
+    /* ── Screens ─────────────────────────────────────── */
+    .screen { display: none; min-height: 100vh; }
+    .screen.active { display: flex; }
+
+    /* ── Login & Challenges screens ──────────────────── */
+    #login-screen, #challenges-screen {
+      align-items: center; justify-content: center; padding: 24px;
+    }
+
+    .card {
+      background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 40px 36px; width: 100%; max-width: 460px; text-align: center;
+    }
+
+    .logo-mark { font-size: 52px; margin-bottom: 12px; display: block; }
+    .card h1 { font-size: 28px; font-weight: 700; color: var(--sage-dk); margin-bottom: 6px; }
+    .card h2 { font-size: 20px; font-weight: 600; color: var(--sage-dk); margin-bottom: 6px; }
+    .card p { color: var(--muted); font-size: 14px; margin-bottom: 28px; line-height: 1.5; }
+
+    .text-input {
+      width: 100%; padding: 12px 16px; border: 1.5px solid var(--border); border-radius: 8px;
+      font-size: 15px; outline: none; transition: border-color .15s;
+      background: var(--cream); color: var(--text);
+    }
+    .text-input:focus { border-color: var(--sage); }
+    .text-input::placeholder { color: #b2bec3; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 11px 24px; border-radius: 8px; font-size: 15px; font-weight: 600;
+      cursor: pointer; border: none; transition: background .15s, transform .1s;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: var(--sage); color: #fff; }
+    .btn-primary:hover { background: var(--sage-dk); }
+    .btn-secondary { background: transparent; color: var(--muted); border: 1.5px solid var(--border); }
+    .btn-secondary:hover { background: var(--cream); }
+    .btn-danger { background: #e74c3c; color: #fff; }
+    .btn-danger:hover { background: #c0392b; }
+
+    .btn-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
+
+    /* ── Challenges cards ────────────────────────────── */
+    .challenges-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 20px 0; text-align: left;
+    }
+    .challenge-card {
+      padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 8px;
+      font-size: 13.5px; cursor: pointer; transition: all .15s; user-select: none;
+      background: var(--cream); color: var(--text); line-height: 1.4;
+    }
+    .challenge-card:hover { border-color: var(--sage); background: var(--sage-lt); }
+    .challenge-card.selected { border-color: var(--sage); background: var(--sage-lt); color: var(--sage-dk); font-weight: 600; }
+    .challenge-card.selected::before { content: "✓ "; }
+
+    .custom-row { display: flex; gap: 8px; margin-top: 4px; }
+    .custom-row .text-input { flex: 1; }
+
+    /* ── Chat screen ─────────────────────────────────── */
+    #chat-screen { flex-direction: column; height: 100vh; }
+
+    header {
+      background: var(--white); border-bottom: 1px solid var(--border);
+      padding: 0 20px; height: 56px; display: flex; align-items: center;
+      justify-content: space-between; flex-shrink: 0; box-shadow: 0 1px 4px rgba(0,0,0,.04);
+    }
+    .header-brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; color: var(--sage-dk); }
+    .header-brand .leaf { font-size: 20px; }
+    .header-user { font-size: 13px; color: var(--muted); font-weight: 400; }
+
+    .header-actions { display: flex; gap: 6px; }
+    .hbtn {
+      padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 500;
+      cursor: pointer; border: 1.5px solid var(--border); background: var(--white);
+      color: var(--muted); transition: all .15s;
+    }
+    .hbtn:hover { border-color: var(--sage); color: var(--sage-dk); background: var(--sage-lt); }
+
+    /* ── Messages ────────────────────────────────────── */
+    #messages {
+      flex: 1; overflow-y: auto; padding: 24px 20px; display: flex;
+      flex-direction: column; gap: 16px;
+    }
+
+    .msg { display: flex; gap: 10px; max-width: 78%; }
+    .msg.sage { align-self: flex-start; }
+    .msg.user { align-self: flex-end; flex-direction: row-reverse; }
+
+    .avatar {
+      width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center;
+      justify-content: center; font-size: 16px; flex-shrink: 0; margin-top: 2px;
+    }
+    .msg.sage .avatar { background: var(--sage-lt); }
+    .msg.user .avatar { background: var(--sage); }
+
+    .bubble {
+      padding: 12px 16px; border-radius: var(--radius); font-size: 14.5px; line-height: 1.6;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .msg.sage .bubble { background: var(--white); border: 1px solid var(--border); color: var(--text); border-top-left-radius: 4px; }
+    .msg.user .bubble { background: var(--sage); color: #fff; border-top-right-radius: 4px; }
+
+    .typing-dots { display: inline-flex; gap: 4px; padding: 4px 0; }
+    .typing-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--sage); opacity: .4; animation: dot 1.2s infinite; }
+    .typing-dots span:nth-child(2) { animation-delay: .2s; }
+    .typing-dots span:nth-child(3) { animation-delay: .4s; }
+    @keyframes dot { 0%,80%,100%{opacity:.4;transform:scale(1)} 40%{opacity:1;transform:scale(1.2)} }
+
+    /* ── Input bar ───────────────────────────────────── */
+    .input-bar {
+      background: var(--white); border-top: 1px solid var(--border);
+      padding: 14px 20px; display: flex; gap: 10px; align-items: flex-end; flex-shrink: 0;
+    }
+    #msg-input {
+      flex: 1; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 10px;
+      font-size: 14.5px; resize: none; outline: none; max-height: 120px; overflow-y: auto;
+      background: var(--cream); color: var(--text); font-family: inherit; line-height: 1.5;
+      transition: border-color .15s;
+    }
+    #msg-input:focus { border-color: var(--sage); }
+    #msg-input::placeholder { color: #b2bec3; }
+    #send-btn {
+      padding: 10px 20px; background: var(--sage); color: #fff; border: none;
+      border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: background .15s; flex-shrink: 0;
+    }
+    #send-btn:hover:not(:disabled) { background: var(--sage-dk); }
+    #send-btn:disabled { opacity: .5; cursor: default; }
+
+    /* ── History panel ───────────────────────────────── */
+    .panel-overlay {
+      position: fixed; inset: 0; background: var(--overlay); z-index: 100;
+      opacity: 0; pointer-events: none; transition: opacity .25s;
+    }
+    .panel-overlay.open { opacity: 1; pointer-events: auto; }
+
+    .side-panel {
+      position: fixed; top: 0; right: -420px; width: 420px; max-width: 100vw;
+      height: 100vh; background: var(--white); box-shadow: -4px 0 20px rgba(0,0,0,.1);
+      z-index: 101; transition: right .25s ease; display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    .side-panel.open { right: 0; }
+
+    .panel-header {
+      padding: 18px 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+    }
+    .panel-header h3 { font-size: 16px; font-weight: 700; color: var(--sage-dk); }
+    .close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--muted); line-height: 1; padding: 2px 6px; }
+    .close-btn:hover { color: var(--text); }
+
+    .panel-body { flex: 1; overflow-y: auto; padding: 20px; }
+
+    .mem-section { margin-bottom: 22px; }
+    .mem-section h4 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--sage); margin-bottom: 10px; }
+    .mem-item { font-size: 13.5px; color: var(--text); line-height: 1.55; padding: 8px 12px; background: var(--cream); border-radius: 8px; margin-bottom: 6px; }
+    .mem-item .date { font-size: 11.5px; color: var(--muted); display: block; margin-bottom: 3px; }
+    .mem-narrative { font-size: 13.5px; color: var(--text); line-height: 1.65; font-style: italic; padding: 12px; background: var(--sage-lt); border-radius: 8px; border-left: 3px solid var(--sage); }
+    .mem-tag { display: inline-block; background: var(--sage-lt); color: var(--sage-dk); font-size: 12px; padding: 3px 9px; border-radius: 20px; margin: 2px; }
+    .empty-note { font-size: 13px; color: var(--muted); font-style: italic; }
+
+    /* ── Prefs modal ─────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: var(--overlay); z-index: 200;
+      display: none; align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow);
+      width: 100%; max-width: 440px; max-height: 90vh; overflow-y: auto;
+    }
+    .modal-header { padding: 20px 24px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .modal-header h3 { font-size: 16px; font-weight: 700; color: var(--sage-dk); }
+    .modal-body { padding: 20px 24px; }
+    .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
+
+    /* ── Confirm dialog ──────────────────────────────── */
+    .confirm-overlay {
+      position: fixed; inset: 0; background: var(--overlay); z-index: 300;
+      display: none; align-items: center; justify-content: center; padding: 20px;
+    }
+    .confirm-overlay.open { display: flex; }
+    .confirm-box { background: var(--white); border-radius: var(--radius); padding: 28px 28px 24px; max-width: 360px; width: 100%; box-shadow: var(--shadow); text-align: center; }
+    .confirm-box h3 { margin-bottom: 10px; color: var(--text); }
+    .confirm-box p { font-size: 14px; color: var(--muted); margin-bottom: 22px; line-height: 1.5; }
+    .confirm-box .btn-row { margin-top: 0; }
+
+    /* ── Scrollbar ───────────────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ── Responsive ──────────────────────────────────── */
+    @media (max-width: 520px) {
+      .card { padding: 28px 20px; }
+      .challenges-grid { grid-template-columns: 1fr; }
+      .header-actions .hbtn span { display: none; }
+      .side-panel { width: 100vw; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ Screen 1: Login ══════════════════════════════════════════════════════ -->
+<div id="login-screen" class="screen active">
+  <div class="card">
+    <span class="logo-mark">🌿</span>
+    <h1>Sage</h1>
+    <p>A compassionate space to explore your thoughts and feelings, powered by AI.</p>
+    <input id="username-input" class="text-input" type="text" placeholder="What's your name?" maxlength="50" autocomplete="off" />
+    <div class="btn-row">
+      <button class="btn btn-primary" id="begin-btn">Begin →</button>
+    </div>
+    <p style="margin-top:20px;font-size:12px;color:#b2bec3;">⚠️ Not a substitute for professional mental health care.</p>
+  </div>
+</div>
+
+<!-- ══ Screen 2: Challenges ═════════════════════════════════════════════════ -->
+<div id="challenges-screen" class="screen">
+  <div class="card" style="max-width:520px;">
+    <span class="logo-mark" style="font-size:36px;">🌱</span>
+    <h2>What are you working through?</h2>
+    <p>Select all that apply. This helps Sage understand you from the start.</p>
+
+    <div class="challenges-grid" id="challenges-grid"></div>
+
+    <div class="custom-row">
+      <input id="custom-challenge" class="text-input" placeholder="Something else (type here)…" style="font-size:13.5px;" />
+      <button class="btn btn-secondary" id="add-custom-btn" style="flex-shrink:0;padding:11px 16px;font-size:13px;">Add</button>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="continue-btn">Continue →</button>
+      <button class="btn btn-secondary" id="skip-btn">Skip for now</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Screen 3: Chat ════════════════════════════════════════════════════════ -->
+<div id="chat-screen" class="screen">
+  <header>
+    <div class="header-brand">
+      <span class="leaf">🌿</span>
+      <span>Sage <span class="header-user" id="header-user"></span></span>
+    </div>
+    <div class="header-actions">
+      <button class="hbtn" id="history-btn"><span>History</span> 📖</button>
+      <button class="hbtn" id="new-btn"><span>New</span> ✨</button>
+      <button class="hbtn" id="reset-btn"><span>Reset</span> 🗑️</button>
+      <button class="hbtn" id="prefs-btn"><span>Prefs</span> ⚙️</button>
+    </div>
+  </header>
+
+  <div id="messages"></div>
+
+  <div class="input-bar">
+    <textarea id="msg-input" placeholder="Type a message… (Enter to send, Shift+Enter for new line)" rows="1"></textarea>
+    <button id="send-btn">Send</button>
+  </div>
+</div>
+
+<!-- ══ History panel ══════════════════════════════════════════════════════ -->
+<div class="panel-overlay" id="panel-overlay"></div>
+<div class="side-panel" id="history-panel">
+  <div class="panel-header">
+    <h3>Memory &amp; History</h3>
+    <button class="close-btn" id="close-history">✕</button>
+  </div>
+  <div class="panel-body" id="history-body">
+    <p class="empty-note">Loading…</p>
+  </div>
+</div>
+
+<!-- ══ Prefs modal ════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="prefs-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>⚙️ Preferences</h3>
+      <button class="close-btn" id="close-prefs">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Preferred name</label>
+        <input id="pref-name" class="text-input" placeholder="e.g. Alex" />
+      </div>
+      <div class="form-group">
+        <label>Pronouns</label>
+        <input id="pref-pronouns" class="text-input" placeholder="e.g. they/them" />
+      </div>
+      <div class="form-group">
+        <label>Response style</label>
+        <input id="pref-style" class="text-input" placeholder="gentle / direct / reflective" />
+      </div>
+      <div class="form-group">
+        <label>Topics to avoid</label>
+        <input id="pref-avoid" class="text-input" placeholder="e.g. religion, politics" />
+      </div>
+      <div class="form-group">
+        <label>Suggest coping exercises</label>
+        <input id="pref-exercises" class="text-input" placeholder="yes / no" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="clear-prefs-btn">Clear all</button>
+      <button class="btn btn-primary" id="save-prefs-btn">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Confirm dialog ═════════════════════════════════════════════════════ -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <h3 id="confirm-title">Are you sure?</h3>
+    <p id="confirm-msg"></p>
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="confirm-cancel">Cancel</button>
+      <button class="btn btn-danger" id="confirm-ok">Yes, continue</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══ State ══════════════════════════════════════════════════════════════════
+const state = {
+  userId: null,
+  isStreaming: false,
+  selectedChallenges: new Set(),
+  customChallenges: [],
+};
+
+const CHALLENGES = [
+  "Anxiety or persistent worry",
+  "Depression or low mood",
+  "Work or academic stress",
+  "Relationship difficulties",
+  "Grief or loss",
+  "Sleep problems",
+  "Low self-esteem or confidence",
+  "Loneliness or isolation",
+  "Trauma or difficult past experiences",
+  "Burnout or exhaustion",
+];
+
+// ══ Screen helpers ══════════════════════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ══ Login ═══════════════════════════════════════════════════════════════════
+const usernameInput = document.getElementById('username-input');
+const beginBtn = document.getElementById('begin-btn');
+
+// Pre-fill from localStorage
+const saved = localStorage.getItem('sage_userId');
+if (saved) usernameInput.value = saved;
+
+usernameInput.addEventListener('keydown', e => { if (e.key === 'Enter') beginBtn.click(); });
+
+beginBtn.addEventListener('click', async () => {
+  const raw = usernameInput.value.trim();
+  if (!raw) { usernameInput.focus(); return; }
+  const userId = raw.replace(/[^a-z0-9_-]/gi, '_').toLowerCase() || 'friend';
+  state.userId = userId;
+  localStorage.setItem('sage_userId', userId);
+
+  beginBtn.disabled = true;
+  beginBtn.textContent = 'Loading…';
+
+  try {
+    const res = await fetch('/api/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    });
+    const data = await res.json();
+    state.isReturning = data.isReturning;
+
+    document.getElementById('header-user').textContent = `· ${userId}`;
+
+    if (data.needsChallenges) {
+      buildChallengeCards();
+      showScreen('challenges-screen');
+    } else {
+      showScreen('chat-screen');
+      await fetchGreeting();
+    }
+  } catch (err) {
+    alert('Could not connect to server: ' + err.message);
+  } finally {
+    beginBtn.disabled = false;
+    beginBtn.textContent = 'Begin →';
+  }
+});
+
+// ══ Challenges ══════════════════════════════════════════════════════════════
+function buildChallengeCards() {
+  const grid = document.getElementById('challenges-grid');
+  grid.innerHTML = '';
+  CHALLENGES.forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'challenge-card';
+    card.textContent = c;
+    card.addEventListener('click', () => {
+      if (state.selectedChallenges.has(c)) {
+        state.selectedChallenges.delete(c);
+        card.classList.remove('selected');
+      } else {
+        state.selectedChallenges.add(c);
+        card.classList.add('selected');
+      }
+    });
+    grid.appendChild(card);
+  });
+}
+
+document.getElementById('add-custom-btn').addEventListener('click', () => {
+  const input = document.getElementById('custom-challenge');
+  const val = input.value.trim();
+  if (!val) return;
+  state.customChallenges.push(val);
+  state.selectedChallenges.add(val);
+
+  const card = document.createElement('div');
+  card.className = 'challenge-card selected';
+  card.textContent = val;
+  card.addEventListener('click', () => {
+    state.selectedChallenges.delete(val);
+    card.remove();
+  });
+  document.getElementById('challenges-grid').appendChild(card);
+  input.value = '';
+});
+
+document.getElementById('custom-challenge').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('add-custom-btn').click();
+});
+
+async function saveChallengesAndProceed(challenges) {
+  if (challenges.length > 0) {
+    await fetch('/api/challenges', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: state.userId, challenges }),
+    });
+  }
+  showScreen('chat-screen');
+  await fetchGreeting();
+}
+
+document.getElementById('continue-btn').addEventListener('click', () => {
+  saveChallengesAndProceed([...state.selectedChallenges]);
+});
+
+document.getElementById('skip-btn').addEventListener('click', () => {
+  saveChallengesAndProceed([]);
+});
+
+// ══ Messaging ════════════════════════════════════════════════════════════════
+const messagesEl = document.getElementById('messages');
+const msgInput   = document.getElementById('msg-input');
+const sendBtn    = document.getElementById('send-btn');
+
+function scrollToBottom() {
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function addMessage(role, text) {
+  const wrap = document.createElement('div');
+  wrap.className = `msg ${role}`;
+
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar';
+  avatar.textContent = role === 'sage' ? '🌿' : '🙂';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = text;
+
+  wrap.appendChild(avatar);
+  wrap.appendChild(bubble);
+  messagesEl.appendChild(wrap);
+  scrollToBottom();
+  return bubble;
+}
+
+function addTypingIndicator() {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg sage';
+  wrap.id = 'typing-indicator';
+
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar';
+  avatar.textContent = '🌿';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
+
+  wrap.appendChild(avatar);
+  wrap.appendChild(bubble);
+  messagesEl.appendChild(wrap);
+  scrollToBottom();
+  return bubble;
+}
+
+function removeTypingIndicator() {
+  const el = document.getElementById('typing-indicator');
+  if (el) el.remove();
+}
+
+async function streamSSE(url, body, onDelta, onDone, onError) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split('\n');
+    buf = lines.pop();
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      try {
+        const data = JSON.parse(line.slice(6));
+        if (data.type === 'delta') onDelta(data.text);
+        else if (data.type === 'done') onDone();
+        else if (data.type === 'error') onError(data.message);
+      } catch { /* ignore parse errors */ }
+    }
+  }
+}
+
+async function fetchGreeting() {
+  const bubble = addTypingIndicator();
+  state.isStreaming = true;
+  setInputEnabled(false);
+
+  let first = true;
+  await streamSSE(
+    '/api/greet',
+    { userId: state.userId },
+    text => {
+      if (first) {
+        removeTypingIndicator();
+        first = false;
+        // Create permanent sage bubble
+        const newBubble = addMessage('sage', '');
+        newBubble._current = '';
+        // Store ref for subsequent deltas
+        state.currentBubble = newBubble;
+      }
+      if (state.currentBubble) {
+        state.currentBubble._current = (state.currentBubble._current || '') + text;
+        state.currentBubble.textContent = state.currentBubble._current;
+        scrollToBottom();
+      }
+    },
+    () => {
+      state.isStreaming = false;
+      state.currentBubble = null;
+      setInputEnabled(true);
+    },
+    err => {
+      removeTypingIndicator();
+      addMessage('sage', '⚠️ Sorry, something went wrong. Please try again.');
+      state.isStreaming = false;
+      state.currentBubble = null;
+      setInputEnabled(true);
+    }
+  );
+}
+
+async function sendMessage() {
+  const text = msgInput.value.trim();
+  if (!text || state.isStreaming) return;
+
+  msgInput.value = '';
+  msgInput.style.height = 'auto';
+  addMessage('user', text);
+  state.isStreaming = true;
+  setInputEnabled(false);
+
+  const indicatorBubble = addTypingIndicator();
+  let first = true;
+
+  await streamSSE(
+    '/api/chat',
+    { userId: state.userId, message: text },
+    deltaText => {
+      if (first) {
+        removeTypingIndicator();
+        first = false;
+        const newBubble = addMessage('sage', '');
+        newBubble._current = '';
+        state.currentBubble = newBubble;
+      }
+      if (state.currentBubble) {
+        state.currentBubble._current += deltaText;
+        state.currentBubble.textContent = state.currentBubble._current;
+        scrollToBottom();
+      }
+    },
+    () => {
+      state.isStreaming = false;
+      state.currentBubble = null;
+      setInputEnabled(true);
+      msgInput.focus();
+    },
+    err => {
+      removeTypingIndicator();
+      addMessage('sage', '⚠️ Sorry, something went wrong. Please try again.');
+      state.isStreaming = false;
+      state.currentBubble = null;
+      setInputEnabled(true);
+    }
+  );
+}
+
+function setInputEnabled(enabled) {
+  msgInput.disabled = !enabled;
+  sendBtn.disabled = !enabled;
+}
+
+sendBtn.addEventListener('click', sendMessage);
+msgInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+// Auto-resize textarea
+msgInput.addEventListener('input', () => {
+  msgInput.style.height = 'auto';
+  msgInput.style.height = Math.min(msgInput.scrollHeight, 120) + 'px';
+});
+
+// ══ History panel ════════════════════════════════════════════════════════════
+document.getElementById('history-btn').addEventListener('click', openHistory);
+document.getElementById('close-history').addEventListener('click', closeHistory);
+document.getElementById('panel-overlay').addEventListener('click', closeHistory);
+
+function openHistory() {
+  document.getElementById('panel-overlay').classList.add('open');
+  document.getElementById('history-panel').classList.add('open');
+  loadHistory();
+}
+
+function closeHistory() {
+  document.getElementById('panel-overlay').classList.remove('open');
+  document.getElementById('history-panel').classList.remove('open');
+}
+
+async function loadHistory() {
+  const body = document.getElementById('history-body');
+  body.innerHTML = '<p class="empty-note">Loading…</p>';
+  try {
+    const res = await fetch(`/api/history/${state.userId}`);
+    const data = await res.json();
+    renderHistory(data, body);
+  } catch {
+    body.innerHTML = '<p class="empty-note">Could not load history.</p>';
+  }
+}
+
+function renderHistory(data, container) {
+  container.innerHTML = '';
+
+  // Stats
+  const statsSection = section('Overview');
+  statsSection.appendChild(item(`Conversation turns: ${data.turnCount}`));
+  statsSection.appendChild(item(`Episodes remembered: ${data.episodes.length}`));
+  statsSection.appendChild(item(`Narrative: ${data.narrative ? 'built' : 'not yet built'}`));
+  container.appendChild(statsSection);
+
+  // Profile
+  const p = data.profile;
+  if (p) {
+    const ps = section('Psychological Profile');
+    if (p.mood_patterns?.length) ps.appendChild(tags('Mood patterns', p.mood_patterns));
+    if (p.triggers?.length) ps.appendChild(tags('Triggers', p.triggers));
+    if (p.recurring_themes?.length) ps.appendChild(tags('Recurring themes', p.recurring_themes));
+    if (p.coping_strategies?.length) ps.appendChild(tags('Coping strategies', p.coping_strategies));
+    if (p.communication_style) ps.appendChild(item(`Style: ${p.communication_style}`));
+    container.appendChild(ps);
+  }
+
+  // Episodes
+  if (data.episodes.length > 0) {
+    const es = section(`Significant Episodes (${data.episodes.length})`);
+    for (const ep of data.episodes) {
+      const d = document.createElement('div');
+      d.className = 'mem-item';
+      d.innerHTML = `<span class="date">${ep.date} · felt: ${ep.emotion}</span>${ep.summary}${ep.context ? `<br><span style="font-size:12px;color:var(--muted)">Context: ${ep.context}</span>` : ''}`;
+      es.appendChild(d);
+    }
+    container.appendChild(es);
+  }
+
+  // Narrative
+  if (data.narrative) {
+    const ns = section('Longitudinal Narrative');
+    const d = document.createElement('p');
+    d.className = 'mem-narrative';
+    d.textContent = data.narrative;
+    ns.appendChild(d);
+    container.appendChild(ns);
+  }
+
+  // Preferences
+  const prefs = data.preferences || {};
+  const prefEntries = Object.entries(prefs).filter(([,v]) => v !== undefined && v !== null && v !== '');
+  if (prefEntries.length > 0) {
+    const prefLabels = { name:'Preferred name', pronouns:'Pronouns', style:'Response style', avoid:'Topics to avoid', exercises:'Coping exercises', challenges:'Challenges' };
+    const ps = section('Preferences');
+    for (const [k, v] of prefEntries) {
+      const display = Array.isArray(v) ? v.join(', ') : v;
+      ps.appendChild(item(`${prefLabels[k] || k}: ${display}`));
+    }
+    container.appendChild(ps);
+  }
+}
+
+function section(title) {
+  const div = document.createElement('div');
+  div.className = 'mem-section';
+  const h4 = document.createElement('h4');
+  h4.textContent = title;
+  div.appendChild(h4);
+  return div;
+}
+
+function item(text) {
+  const d = document.createElement('div');
+  d.className = 'mem-item';
+  d.textContent = text;
+  return d;
+}
+
+function tags(label, items) {
+  const d = document.createElement('div');
+  d.style.marginBottom = '8px';
+  d.innerHTML = `<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">${label}</div>`;
+  for (const t of items) {
+    const span = document.createElement('span');
+    span.className = 'mem-tag';
+    span.textContent = t;
+    d.appendChild(span);
+  }
+  return d;
+}
+
+// ══ Prefs modal ══════════════════════════════════════════════════════════════
+document.getElementById('prefs-btn').addEventListener('click', openPrefs);
+document.getElementById('close-prefs').addEventListener('click', closePrefs);
+document.getElementById('prefs-overlay').addEventListener('click', e => { if (e.target === document.getElementById('prefs-overlay')) closePrefs(); });
+
+async function openPrefs() {
+  // Load current prefs
+  try {
+    const res = await fetch(`/api/history/${state.userId}`);
+    const data = await res.json();
+    const p = data.preferences || {};
+    document.getElementById('pref-name').value = p.name || '';
+    document.getElementById('pref-pronouns').value = p.pronouns || '';
+    document.getElementById('pref-style').value = p.style || '';
+    document.getElementById('pref-avoid').value = p.avoid || '';
+    document.getElementById('pref-exercises').value = p.exercises || '';
+  } catch { /* ignore */ }
+  document.getElementById('prefs-overlay').classList.add('open');
+}
+
+function closePrefs() {
+  document.getElementById('prefs-overlay').classList.remove('open');
+}
+
+document.getElementById('save-prefs-btn').addEventListener('click', async () => {
+  const fields = { name: 'pref-name', pronouns: 'pref-pronouns', style: 'pref-style', avoid: 'pref-avoid', exercises: 'pref-exercises' };
+  const saves = [];
+  for (const [key, id] of Object.entries(fields)) {
+    const value = document.getElementById(id).value.trim();
+    saves.push(fetch(`/api/prefs/${state.userId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value }),
+    }));
+  }
+  await Promise.all(saves);
+  closePrefs();
+});
+
+document.getElementById('clear-prefs-btn').addEventListener('click', () => {
+  confirm('Clear all preferences?', 'This cannot be undone.', async () => {
+    await fetch(`/api/prefs/${state.userId}`, { method: 'DELETE' });
+    closePrefs();
+  });
+});
+
+// ══ New / Reset ═══════════════════════════════════════════════════════════════
+document.getElementById('new-btn').addEventListener('click', () => {
+  confirm(
+    'Start a fresh conversation?',
+    'Your profile and memories are preserved. Only the current conversation will be cleared.',
+    async () => {
+      await fetch(`/api/new/${state.userId}`, { method: 'POST' });
+      messagesEl.innerHTML = '';
+      await fetchGreeting();
+    }
+  );
+});
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+  confirm(
+    'Reset everything?',
+    'This will permanently delete all your memories, profile, episodes, and preferences.',
+    async () => {
+      await fetch(`/api/reset/${state.userId}`, { method: 'POST' });
+      state.selectedChallenges.clear();
+      state.customChallenges = [];
+      messagesEl.innerHTML = '';
+      // Show challenge screen again for re-onboarding
+      buildChallengeCards();
+      showScreen('challenges-screen');
+    }
+  );
+});
+
+// ══ Confirm dialog ════════════════════════════════════════════════════════════
+let confirmCallback = null;
+
+function confirm(title, msg, onOk) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-msg').textContent = msg;
+  confirmCallback = onOk;
+  document.getElementById('confirm-overlay').classList.add('open');
+}
+
+document.getElementById('confirm-cancel').addEventListener('click', () => {
+  document.getElementById('confirm-overlay').classList.remove('open');
+  confirmCallback = null;
+});
+
+document.getElementById('confirm-ok').addEventListener('click', async () => {
+  document.getElementById('confirm-overlay').classList.remove('open');
+  if (confirmCallback) await confirmCallback();
+  confirmCallback = null;
+});
+</script>
+</body>
+</html>

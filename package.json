@@ -1,0 +1,24 @@
+{
+  "name": "mental-health-chatbot",
+  "version": "1.0.0",
+  "description": "A compassionate mental health support chatbot powered by Claude AI",
+  "type": "module",
+  "main": "chatbot.js",
+  "scripts": {
+    "start": "node chatbot.js",
+    "dev": "node --watch chatbot.js",
+    "start:web": "node server.js",
+    "dev:web": "node --watch server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "express": "^4.18.0",
+    "mongodb": "^6.0.0",
+    "redis": "^4.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["mental-health", "chatbot", "claude", "ai"],
+  "license": "MIT"
+}
