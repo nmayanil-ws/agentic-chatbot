@@ -16,6 +16,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import * as mem from "./memory.js";
 import * as mongo from "./mongo.js";
+import { runAgentLoop } from "./agent.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -420,47 +421,45 @@ function triggerProfileUpdate(userId, messages) {
 // ── Core chat function ────────────────────────────────────────────────────────
 
 async function chat(userId, messages, userInput, systemPrompt) {
-  messages.push({ role: "user", content: userInput });
+  let indicator = "";
 
-  process.stdout.write("\n🌿 Sage: ");
-  let fullResponse = "";
-
-  const stream = await client.messages.stream({
-    model: "claude-sonnet-4-6",
-    max_tokens: 1024,
-    system: systemPrompt,
+  const { text: fullResponse, messages: updatedMessages } = await runAgentLoop(client, {
+    userId,
     messages,
+    userInput,
+    systemPrompt,
+    onToolCall: (label) => {
+      // Overwrite the current line with a dim status indicator
+      process.stdout.write(`\r  ⋯ ${label}${" ".repeat(Math.max(0, 40 - label.length))}`);
+      indicator = label;
+    },
+    onText: (text) => {
+      if (indicator) {
+        // Clear the indicator line before printing Sage's reply
+        process.stdout.write("\r" + " ".repeat(indicator.length + 45) + "\r");
+        indicator = "";
+      }
+      process.stdout.write("\n🌿 Sage: " + formatSageResponse(text) + "\n\n");
+    },
   });
 
-  for await (const chunk of stream) {
-    if (
-      chunk.type === "content_block_delta" &&
-      chunk.delta.type === "text_delta"
-    ) {
-      process.stdout.write(chunk.delta.text);
-      fullResponse += chunk.delta.text;
-    }
-  }
-
-  console.log("\n");
-
-  messages.push({ role: "assistant", content: fullResponse });
-
-  // Persist to Redis (await) and MongoDB (fire-and-forget)
+  // Persist only the text turns to Redis + MongoDB (tool turns stay in-memory only)
   await mem.appendMessage(userId, "user", userInput);
   await mem.appendMessage(userId, "assistant", fullResponse);
   mongo.appendMessage(userId, "user", userInput);
   mongo.appendMessage(userId, "assistant", fullResponse);
 
-  // Trigger background profile update every N user turns
+  // Profile update — filter to text-only messages so the profiling prompt stays clean
   sessionMessageCount++;
   messagesSinceLastProfileUpdate++;
   if (messagesSinceLastProfileUpdate >= PROFILE_UPDATE_EVERY) {
     messagesSinceLastProfileUpdate = 0;
-    triggerProfileUpdate(userId, messages);
+    const textOnly = updatedMessages.filter((m) => typeof m.content === "string");
+    triggerProfileUpdate(userId, textOnly);
   }
 
-  return messages;
+  // Return the full updated history (including tool turns) for intra-session coherence
+  return updatedMessages;
 }
 
 // ── Opening greeting ──────────────────────────────────────────────────────────

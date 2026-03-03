@@ -12,6 +12,7 @@ import express from "express";
 import Anthropic from "@anthropic-ai/sdk";
 import * as mem from "./memory.js";
 import * as mongo from "./mongo.js";
+import { runAgentLoop } from "./agent.js";
 import { fileURLToPath } from "url";
 import * as path from "path";
 import * as fs from "fs";
@@ -337,7 +338,7 @@ app.post("/api/greet", async (req, res) => {
   }
 });
 
-// POST /api/chat  (SSE)
+// POST /api/chat  (SSE — agentic loop)
 app.post("/api/chat", async (req, res) => {
   const { userId, message } = req.body;
   if (!userId || !message) return res.status(400).json({ error: "userId and message required" });
@@ -347,25 +348,26 @@ app.post("/api/chat", async (req, res) => {
   const session = getSession(userId);
   const systemPrompt = buildEnrichedSystemPrompt(session.memory, BASE_SYSTEM_PROMPT);
 
-  session.messages.push({ role: "user", content: message });
-
   try {
-    let fullResponse = "";
-    const stream = await client.messages.stream({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1024,
-      system: systemPrompt,
+    const { text: fullResponse, messages: updatedMessages } = await runAgentLoop(client, {
+      userId,
       messages: session.messages,
+      userInput: message,
+      systemPrompt,
+      onToolCall: (label) => sseSend(res, { type: "tool_call", label }),
+      onText: (text) => {
+        // Chunk the final text to preserve the typing effect in the browser
+        const CHUNK = 20;
+        for (let i = 0; i < text.length; i += CHUNK) {
+          sseSend(res, { type: "delta", text: text.slice(i, i + CHUNK) });
+        }
+      },
     });
 
-    for await (const chunk of stream) {
-      if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
-        fullResponse += chunk.delta.text;
-        sseSend(res, { type: "delta", text: chunk.delta.text });
-      }
-    }
+    // Full history (including tool turns) for intra-session API coherence
+    session.messages = updatedMessages;
 
-    session.messages.push({ role: "assistant", content: fullResponse });
+    // Persist only the text turns to Redis + MongoDB
     await mem.appendMessage(userId, "user", message);
     await mem.appendMessage(userId, "assistant", fullResponse);
     mongo.appendMessage(userId, "user", message);
@@ -375,7 +377,9 @@ app.post("/api/chat", async (req, res) => {
     session.messagesSinceUpdate++;
     if (session.messagesSinceUpdate >= PROFILE_UPDATE_EVERY) {
       session.messagesSinceUpdate = 0;
-      runProfileUpdate(userId, session.messages).catch(() => {});
+      // Filter to text-only turns so the profiling prompt stays clean
+      const textOnly = session.messages.filter((m) => typeof m.content === "string");
+      runProfileUpdate(userId, textOnly).catch(() => {});
     }
 
     sseSend(res, { type: "done" });
